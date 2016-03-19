@@ -240,17 +240,33 @@ function construct_sessions_data_for_add($formdata) {
             $startweek = $startdate - ($wday-1) * DAYSECS;
         }
 
+        if (strstr($formdata->keyword, ",")) 
+            $Multikeys = explode(",", $formdata->keyword);
+        
+
         $wdaydesc = array(0=>'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat');
 
         while ($sdate < $enddate) {
             if ($sdate < $startweek + WEEKSECS) {
                 $dinfo = usergetdate($sdate);
                 if (isset($formdata->sdays) && array_key_exists($wdaydesc[$dinfo['wday']], $formdata->sdays)) {
+                    if (is_array($Multikeys)) {
+                        $formdata->keyword = trim(current($Multikeys));
+                        if (empty($formdata->keyword)) {
+                            reset($Multikeys);
+                            $formdata->keyword = trim(current($Multikeys));
+                        }
+                        next($Multikeys);
+                    }
+                
                     $sess = new stdClass();
                     $sess->sessdate =  usergetmidnight($sdate) + $starttime;
                     $sess->duration = $duration;
                     $sess->descriptionitemid = $formdata->sdescription['itemid'];
                     $sess->description = $formdata->sdescription['text'];
+                    $sess->keyw = $formdata->keyw;
+                    $sess->late = $formdata->late;
+                    $sess->keyword = $formdata->keyword;
                     $sess->descriptionformat = $formdata->sdescription['format'];
                     $sess->timemodified = $now;
                     if (isset($formdata->studentscanmark)) { // Students will be able to mark their own attendance.
@@ -272,6 +288,9 @@ function construct_sessions_data_for_add($formdata) {
         $sess->duration = $duration;
         $sess->descriptionitemid = $formdata->sdescription['itemid'];
         $sess->description = $formdata->sdescription['text'];
+        $sess->keyw = $formdata->keyw;
+        $sess->late = $formdata->late;
+        $sess->keyword = $formdata->keyword;
         $sess->descriptionformat = $formdata->sdescription['format'];
         $sess->timemodified = $now;
         if (isset($formdata->studentscanmark)) { // Students will be able to mark their own attendance.

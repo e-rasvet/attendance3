@@ -423,7 +423,13 @@ class attendance {
 
     /** @var int attendance instance identifier */
     public $id;
+    
+    /** @var string attendance activity ips */
+    public $ips;
 
+    /** @var string attendance activity keyword */
+    public $keyword;
+ 
     /** @var string attendance activity name */
     public $name;
 
@@ -443,6 +449,7 @@ class attendance {
 
     // Arrays by userid.
     private $usertakensesscount = array();
+    private $useroffcampussesscount = array();
     private $userstatusesstat = array();
 
     /**
@@ -758,6 +765,9 @@ class attendance {
         }
 
         $sess->sessdate = $formdata->sessiondate;
+        $sess->keyw = $formdata->keyw;                     //---E.Rasvet line
+        $sess->late = $formdata->late;                     //---E.Rasvet line
+        $sess->keyword = $formdata->keyword;               //---E.Rasvet line
         $sess->duration = $formdata->durtime['hours']*HOURSECS + $formdata->durtime['minutes']*MINSECS;
         $description = file_save_draft_area_files($formdata->sdescription['itemid'],
                                 $this->context->id, 'mod_attendance', 'session', $sessionid,
@@ -787,6 +797,9 @@ class attendance {
      */
     public function take_from_student($mformdata) {
         global $DB, $USER;
+        
+        if (!isset($mformdata->status))
+          return false;
 
         $statuses = implode(',', array_keys( (array)$this->get_statuses() ));
         $now = time();
@@ -797,6 +810,10 @@ class attendance {
         $record->statusset = $statuses;
         $record->remarks = get_string('set_by_student', 'mod_attendance');
         $record->sessionid = $mformdata->sessid;
+        
+        if (isset($mformdata->offcampus))
+          $record->offcampus = $mformdata->offcampus;
+        
         $record->timetaken = $now;
         $record->takenby = $USER->id;
 
@@ -806,8 +823,8 @@ class attendance {
             return false;
         }
 
-        $logid = $DB->insert_record('attendance_log', $record, false);
-        $record->id = $logid;
+        if ($record->statusid)
+          $record->id = $DB->insert_record('attendance_log', $record, false);
 
         // Update the session to show that a register has been taken, or staff may overwrite records.
         $session = $this->get_session_info($mformdata->sessid);
@@ -823,7 +840,7 @@ class attendance {
          * from report/log page */
 
         $params = array(
-                'sessionid' => $this->pageparams->sessionid,
+                'sessionid' => $mformdata->sessid,
                 'grouptype' => 0);
 
         // Log the change.
@@ -913,11 +930,14 @@ class attendance {
             $numberofpages = ceil($totalusers / $usersperpage);
             if ($this->pageparams->page < $numberofpages) {
                 $params['page'] = $this->pageparams->page + 1;
-                redirect($this->url_take($params), get_string('moreattendance', 'attendance'));
+                
+                if (!isset($formdata['noredirect']))
+                  redirect($this->url_take($params), get_string('moreattendance', 'attendance'));
             }
         }
 
-        redirect($this->url_manage(), get_string('attendancesuccess', 'attendance'));
+        if (!isset($formdata['noredirect']))
+          redirect($this->url_manage(), get_string('attendancesuccess', 'attendance'));
     }
 
     /**
@@ -1117,6 +1137,48 @@ class attendance {
         return $sessions;
     }
 
+    public function get_session_byid($sessionid) {
+        global $DB;
+
+        return $DB->get_record('attendance_sessions', array('id' => $sessionid));
+    }
+    
+    public function check_session_keyword($sessionid, $word) {
+        global $DB;
+        
+        $sess = $DB->get_record('attendance_sessions', array('id' => $sessionid));
+
+        if (!empty($sess->keyword)) 
+          $keyword = $sess->keyword;
+        else
+          $keyword = $this->keyword;
+          
+        if ($keyword != $word) 
+          return false;
+        else 
+          return true;
+    }
+    
+    public function get_session_offcampus($sessionid) {
+        global $DB;
+        
+        if (isset($sessionid))
+          return $DB->get_records('attendance_log', array('sessionid' => $sessionid, 'offcampus' => 1), '', 'studentid,statusid,remarks,id');
+        else 
+          return $DB->get_records('attendance_log', array('offcampus' => 1), '', 'studentid,statusid,remarks,id');
+    }
+    
+    public function get_user_offcampus_sessions_count($userid) {
+        if (!array_key_exists($userid, $this->useroffcampussesscount)) {
+            if (!empty($this->pageparams->startdate) && !empty($this->pageparams->enddate)) {
+                $this->useroffcampussesscount[$userid] = att_get_user_offcampus_sessions_count($this->id, $this->course->startdate, $userid, $this->cm, $this->pageparams->startdate, $this->pageparams->enddate);
+            } else {
+                $this->useroffcampussesscount[$userid] = att_get_user_offcampus_sessions_count($this->id, $this->course->startdate, $userid, $this->cm);
+            }
+        }
+        return $this->useroffcampussesscount[$userid];
+    }
+
     public function get_session_log($sessionid) {
         global $DB;
 
@@ -1126,7 +1188,8 @@ class attendance {
     public function get_user_stat($userid) {
         $ret = array();
         $ret['completed'] = $this->get_user_taken_sessions_count($userid);
-        $ret['statuses'] = $this->get_user_statuses_stat($userid);
+        $ret['offcampus'] = $this->get_user_offcampus_sessions_count($userid);
+        $ret['statuses']  = $this->get_user_statuses_stat($userid);
 
         return $ret;
     }
@@ -1583,6 +1646,83 @@ function att_get_setname($attid, $statusset, $includevalues = true) {
     return $statusname;
 }
 
+function att_get_statuse($attid, $acronym) {
+    global $DB;
+
+    $statuse = $DB->get_record('attendance_statuses', 
+                                            array('attendanceid' => $attid, 'acronym' => $acronym)); 
+
+    return $statuse;
+}
+
+function att_get_user_offcampus_sessions_count($attid, $coursestartdate, $userid, $coursemodule, $startdate = '', $enddate = '') {
+    global $DB, $COURSE;
+    $groupmode = groups_get_activity_groupmode($coursemodule, $COURSE);
+    if (!empty($groupmode)) {
+        $qry = "SELECT count(*) as cnt
+              FROM {attendance_log} al
+              JOIN {attendance_sessions} ats ON al.sessionid = ats.id
+              LEFT JOIN {groups_members} gm ON gm.userid = al.studentid AND gm.groupid = ats.groupid
+             WHERE ats.attendanceid = :aid AND
+                   ats.sessdate >= :cstartdate AND
+                   al.studentid = :uid AND
+                   al.offcampus = 1 AND
+                   (ats.groupid = 0 or gm.id is NOT NULL)";
+    } else {
+        $qry = "SELECT count(*) as cnt
+              FROM {attendance_log} al
+              JOIN {attendance_sessions} ats
+                ON al.sessionid = ats.id
+             WHERE ats.attendanceid = :aid AND
+                   ats.sessdate >= :cstartdate AND
+                   al.studentid = :uid AND
+                   al.offcampus = 1";
+    }
+    $params = array(
+        'aid'           => $attid,
+        'cstartdate'    => $coursestartdate,
+        'uid'           => $userid);
+
+    if (!empty($startdate) && !empty($enddate)) {
+        $qry .= ' AND sessdate >= :sdate AND sessdate < :edate ';
+        $params['sdate'] = $startdate;
+        $params['edate'] = $enddate;
+    }
+
+    return $DB->count_records_sql($qry, $params);
+}
+
+function att_get_user_offcampus_stat($attid, $coursestartdate, $userid, $coursemodule) {
+    global $DB, $COURSE;
+    $groupmode = groups_get_activity_groupmode($coursemodule, $COURSE);
+    if (!empty($groupmode)) {
+        $qry = "SELECT al.statusid, count(al.statusid) AS stcnt
+              FROM {attendance_log} al
+              JOIN {attendance_sessions} ats ON al.sessionid = ats.id AND al.offcampus = 1
+              LEFT JOIN {groups_members} gm ON gm.userid = al.studentid AND gm.groupid = ats.groupid
+             WHERE ats.attendanceid = :aid AND
+                   ats.sessdate >= :cstartdate AND
+                   al.studentid = :uid AND
+                   (ats.groupid = 0 or gm.id is NOT NULL)
+          GROUP BY al.statusid";
+    } else {
+        $qry = "SELECT al.statusid, count(al.statusid) AS stcnt
+              FROM {attendance_log} al
+              JOIN {attendance_sessions} ats
+                ON al.sessionid = ats.id AND al.offcampus = 1
+             WHERE ats.attendanceid = :aid AND
+                   ats.sessdate >= :cstartdate AND
+                   al.studentid = :uid
+          GROUP BY al.statusid";
+    }
+    $params = array(
+            'aid'           => $attid,
+            'cstartdate'    => $coursestartdate,
+            'uid'           => $userid);
+
+    return $DB->get_records_sql($qry, $params);
+}
+
 function att_get_user_taken_sessions_count($attid, $coursestartdate, $userid, $coursemodule, $startdate = '', $enddate = '') {
     global $DB, $COURSE;
     $groupmode = groups_get_activity_groupmode($coursemodule, $COURSE);
@@ -1709,6 +1849,7 @@ function att_update_all_users_grades($attid, $course, $context, $coursemodule) {
         $grade->userid = $userid;
         $userstatusesstat = att_get_user_statuses_stat($attid, $course->startdate, $userid, $coursemodule);
         $usertakensesscount = att_get_user_taken_sessions_count($attid, $course->startdate, $userid, $coursemodule);
+        $useroffcampussesscount = att_get_user_offcampus_sessions_count($attid, $course->startdate, $userid, $coursemodule);
         $usergrade = att_get_user_grade($userstatusesstat, $statuses);
         $usermaxgrade = att_get_user_max_grade($usertakensesscount, $statuses);
         $grade->rawgrade = att_calc_user_grade_fraction($usergrade, $usermaxgrade) * $gradebook_maxgrade;

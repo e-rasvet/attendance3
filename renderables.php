@@ -261,6 +261,8 @@ class attendance_take_data implements renderable {
     public $sessioninfo;
 
     public $sessionlog;
+    
+    public $sessionoffcampus;
 
     public $sessions4copy;
 
@@ -289,10 +291,13 @@ class attendance_take_data implements renderable {
 
         if (isset($att->pageparams->copyfrom)) {
             $this->sessionlog = $att->get_session_log($att->pageparams->copyfrom);
+            $this->sessionoffcampus = $att->get_session_offcampus($att->pageparams->copyfrom);
         } else if ($this->updatemode) {
             $this->sessionlog = $att->get_session_log($att->pageparams->sessionid);
+            $this->sessionoffcampus = $att->get_session_offcampus($att->pageparams->sessionid);
         } else {
             $this->sessionlog = array();
+            $this->sessionoffcampus = array();
         }
 
         if (!$this->updatemode) {
@@ -397,11 +402,13 @@ class attendance_user_data implements renderable {
                 $statuses = att_get_statuses($ca->attid);
                 $user_taken_sessions_count = att_get_user_taken_sessions_count($ca->attid, $ca->coursestartdate, $userid, $att->cm);
                 $user_statuses_stat = att_get_user_statuses_stat($ca->attid, $ca->coursestartdate, $userid, $att->cm);
+                $user_offcampus_stat = att_get_user_offcampus_stat($ca->attid, $ca->coursestartdate, $userid, $att->cm);
 
                 $this->statuses[$ca->attid] = $statuses;
 
                 $this->stat[$ca->attid]['completed'] = $user_taken_sessions_count;
                 $this->stat[$ca->attid]['statuses'] = $user_statuses_stat;
+                $this->stat[$ca->attid]['offcampus'] = count($user_offcampus_stat);
 
                 $this->gradable[$ca->attid] = $ca->attgrade > 0;
 
@@ -433,6 +440,7 @@ class attendance_user_data implements renderable {
 
 class attendance_report_data implements renderable {
     public $pageparams;
+    public $cm;
 
     public $users;
 
@@ -441,6 +449,7 @@ class attendance_report_data implements renderable {
     public $sessions;
 
     public $statuses;
+    
     // Includes disablrd/deleted statuses.
     public $allstatuses;
 
@@ -457,6 +466,8 @@ class attendance_report_data implements renderable {
     public $grades = array();
 
     public $maxgrades = array();
+    
+    public $sessionoffcampus = array();
 
     public $att;
 
@@ -469,6 +480,7 @@ class attendance_report_data implements renderable {
         }
 
         $this->pageparams = $att->pageparams;
+        $this->cm = $att->cm;
 
         $this->users = $att->get_users($att->pageparams->group, $att->pageparams->page);
 
@@ -486,6 +498,9 @@ class attendance_report_data implements renderable {
 
         $this->statuses = $att->get_statuses(true, true);
         $this->allstatuses = $att->get_statuses(false, true);
+        
+        foreach($this->sessions as $ses)
+          $this->sessionoffcampus[$ses->id] = $att->get_session_offcampus($ses->id);
 
         $this->gradable = $att->grade > 0;
 

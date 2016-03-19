@@ -51,13 +51,13 @@ class mod_attendance_update_form extends moodleform {
         if (!$sess = $DB->get_record('attendance_sessions', array('id'=> $sessionid) )) {
             error('No such session in this course');
         }
-        $dhours = floor($sess->duration / HOURSECS);
-        $dmins = floor(($sess->duration - $dhours * HOURSECS) / MINSECS);
+        $dhours  = floor($sess->duration / HOURSECS);
+        $dmins   = floor(($sess->duration - $dhours * HOURSECS) / MINSECS);
         $defopts = array('maxfiles'=>EDITOR_UNLIMITED_FILES, 'noclean'=>true, 'context'=>$modcontext);
-        $sess = file_prepare_standard_editor($sess, 'description', $defopts, $modcontext, 'mod_attendance', 'session', $sess->id);
-        $data = array('sessiondate' => $sess->sessdate,
+        $sess    = file_prepare_standard_editor($sess, 'description', $defopts, $modcontext, 'mod_attendance', 'session', $sess->id);
+        $data    = array('sessiondate' => $sess->sessdate,
                 'durtime' => array('hours' => $dhours, 'minutes' => $dmins),
-                'sdescription' => $sess->description_editor);
+                'sdescription' => $sess->description_editor, 'keyw' => $sess->keyw, 'keyword' => $sess->keyword, 'late' => $sess->late);
 
         $mform->addElement('header', 'general', get_string('changesession', 'attendance'));
 
@@ -74,6 +74,13 @@ class mod_attendance_update_form extends moodleform {
         $durselect[] =& $mform->createElement('select', 'hours', '', $hours);
         $durselect[] =& $mform->createElement('select', 'minutes', '', $minutes, false, true);
         $mform->addGroup($durselect, 'durtime', get_string('duration', 'attendance'), array(' '), true);
+        
+        $late = array(0=>"--",1=>1,2=>2,3=>3,4=>4,5=>5,10=>10,15=>15,20=>20,30=>30);
+        
+        $mform->addElement('select', 'late', get_string('minuteslate', 'attendance'), $late, false, true);
+ 
+        $mform->addElement('checkbox', 'keyw', '', get_string('usekeyword','attendance'));
+        $mform->addElement('text', 'keyword', get_string('keyword','attendance'), array('size'=>'16'));
 
         // Show which status set is in use.
         $maxstatusset = attendance_get_max_statusset($this->_customdata['att']->id);

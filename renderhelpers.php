@@ -245,6 +245,11 @@ function construct_user_data_stat($stat, $statuses, $gradable, $grade, $maxgrade
 
         $stattable->data[] = $row;
     }
+    
+    $row = new html_table_row();
+    $row->cells[] = get_string('offcampus', 'attendance') . ':';
+    $row->cells[] = $stat['offcampus'];
+    $stattable->data[] = $row;
 
     if ($gradable) {
         $row = new html_table_row();
@@ -273,6 +278,7 @@ function construct_full_user_stat_html_table($attendance, $course, $user, $cours
     $statuses = att_get_statuses($attendance->id);
     $userstatusesstat = att_get_user_statuses_stat($attendance->id, $course->startdate, $user->id, $coursemodule);
     $stat['completed'] = att_get_user_taken_sessions_count($attendance->id, $course->startdate, $user->id, $coursemodule);
+    $stat['offcampus'] = att_get_user_offcampus_sessions_count($attendance->id, $course->startdate, $user->id, $coursemodule);
     $stat['statuses'] = $userstatusesstat;
     if ($gradeable) {
         $grade = att_get_user_grade($userstatusesstat, $statuses);

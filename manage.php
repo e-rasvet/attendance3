@@ -31,6 +31,9 @@ $id                         = required_param('id', PARAM_INT);
 $from                       = optional_param('from', null, PARAM_ALPHANUMEXT);
 $pageparams->view           = optional_param('view', null, PARAM_INT);
 $pageparams->curdate        = optional_param('curdate', null, PARAM_INT);
+$time                       = optional_param('time', null, PARAM_INT);
+$group                      = optional_param('group', null, PARAM_INT);
+$word                       = optional_param('word', null, PARAM_TEXT);
 $pageparams->perpage        = get_config('attendance', 'resultsperpage');
 
 $cm             = get_coursemodule_from_id('attendance', $id, 0, false, MUST_EXIST);
@@ -45,12 +48,15 @@ $capabilities = array(
     'mod/attendance:takeattendances',
     'mod/attendance:changeattendances'
 );
+
+$att            = new attendance($att, $cm, $course, $context, $pageparams);
+$att->groupID = $group;
+
 if (!has_any_capability($capabilities, $context)) {
     redirect($att->url_view());
 }
 
 $pageparams->init($cm);
-$att = new attendance($att, $cm, $course, $context, $pageparams);
 
 // If teacher is coming from block, then check for a session exists for today.
 if ($from === 'block') {

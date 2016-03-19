@@ -51,6 +51,9 @@ class restore_attendance_activity_structure_step extends restore_activity_struct
 
         $paths[] = new restore_path_element('attendance_session',
                        '/activity/attendance/sessions/session');
+                       
+        $paths[] = new restore_path_element('attendance_ips',
+                       '/activity/attendance/ips/ip');
 
         // End here if no-user data has been selected.
         if (!$userinfo) {
@@ -146,6 +149,22 @@ class restore_attendance_activity_structure_step extends restore_activity_struct
         $data->takenby = $this->get_mappingid('user', $data->takenby);
 
         $newitemid = $DB->insert_record('attendance_log', $data);
+    }
+    
+    
+    /**
+     * Process attendance ips restore
+     * @param object $data The data in object form
+     * @return void
+     */
+    protected function process_attendance_ips($data) {
+        global $DB;
+
+        $data = (object)$data;
+        $oldid = $data->id;
+
+        $newitemid = $DB->insert_record('attendance_ips', $data);
+        $this->set_mapping('attendance_ip', $oldid, $newitemid);
     }
 
     /**

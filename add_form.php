@@ -109,6 +109,10 @@ class mod_attendance_add_form extends moodleform {
         $mform->addElement('checkbox', 'studentscanmark', '', get_string('studentscanmark','attendance'));
         $mform->addHelpButton('studentscanmark', 'studentscanmark', 'attendance');
 
+        $mform->addElement('checkbox', 'keyw', '', get_string('usekeyword','attendance'));              //---E.Rasvet---new line
+        $mform->addHelpButton('keyw', 'keyw', 'attendance');                                            //---E.Rasvet---new line
+        $mform->addElement('text', 'keyword', get_string('keyword','attendance'), array('size'=>'16')); //---E.Rasvet---new line
+
         $mform->addElement('date_time_selector', 'sessiondate', get_string('sessiondate', 'attendance'));
 
         for ($i=0; $i<=23; $i++) {
@@ -121,6 +125,10 @@ class mod_attendance_add_form extends moodleform {
         $durtime[] =& $mform->createElement('select', 'hours', get_string('hour', 'form'), $hours, false, true);
         $durtime[] =& $mform->createElement('select', 'minutes', get_string('minute', 'form'), $minutes, false, true);
         $mform->addGroup($durtime, 'durtime', get_string('duration', 'attendance'), array(' '), true);
+
+        $late = array(0=>"--",1=>1,2=>2,3=>3,4=>4,5=>5,10=>10,15=>15,20=>20,30=>30);                         //---E.Rasvet---new line
+        $mform->addElement('select', 'late', get_string('minuteslate', 'attendance'), $late, false, true);   //---E.Rasvet---new line
+        $mform->addHelpButton('late', 'late', 'attendance');                                                 //---E.Rasvet---new line
 
         $mform->addElement('date_selector', 'sessionenddate', get_string('sessionenddate', 'attendance'));
         $mform->disabledIf('sessionenddate', 'addmultiply', 'notchecked');
@@ -184,6 +192,24 @@ class mod_attendance_add_form extends moodleform {
         if ($data['sessiontype'] == attendance::SESSION_GROUP and empty($data['groups'])) {
             $errors['groups'] = get_string('errorgroupsnotselected', 'attendance');
         }
+        
+/*
+*---E.Rasvet---start
+*/
+        $durtime  = $data['durtime']['hours'] * 60 * 60 + $data['durtime']['minutes'] * 60;
+        $latetime = $data['late'] * 60;
+
+        if ($durtime < $latetime) {
+            $errors['late'] = get_string('errorlatetime', 'attendance');
+        }
+
+        if ($data['durtime'] == attendance::SESSION_GROUP and empty($data['groups'])) {
+            $errors['groups'] = get_string('errorgroupsnotselected', 'attendance');
+        }
+/*
+*---E.Rasvet---end
+*/
+
 
         $addmulti = isset($data['addmultiply'])? (int)$data['addmultiply'] : 0;
         if (($addmulti != 0) && (!array_key_exists('sdays',$data) || empty($data['sdays']))) {
