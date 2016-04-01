@@ -62,9 +62,6 @@ class backup_attendance_activity_structure_step extends backup_activity_structur
             'sessionid', 'studentid', 'statusid', 'lasttaken', 'statusset',
             'timetaken', 'takenby', 'remarks', 'offcampus'));
             
-        $ips = new backup_nested_element('ips');
-        $ip  = new backup_nested_element('ip', array('id'), array(
-            'ip', 'location'));
 
         // Build the tree in the order needed for restore.
         $attendance->add_child($statuses);
@@ -75,9 +72,6 @@ class backup_attendance_activity_structure_step extends backup_activity_structur
 
         $session->add_child($logs);
         $logs->add_child($log);
-
-        $attendance->add_child($ips);
-        $ips->add_child($ip);
 
         // Data sources - non-user data.
 
